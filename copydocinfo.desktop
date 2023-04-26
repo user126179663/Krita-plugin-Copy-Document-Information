@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Service
+ServiceTypes=Krita/PythonPlugin
+X-KDE-Library=copydocinfo
+X-Python-2-Compatible=false
+X-Krita-Manual=manual.txt
+Name=Copy Document Information
+Comment=Copying document information.

@@ -1,0 +1,4 @@
+Copy document information to the clipboard.
+
+Usage:
+Select [Tools] from the menu bar and click on [Copy Document Information].

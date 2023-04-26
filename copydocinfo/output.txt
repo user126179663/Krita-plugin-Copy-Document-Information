@@ -1,0 +1,136 @@
+
+	output.txt 内では、ドキュメント情報のデータの値は、その名前を % で囲うことで表します。
+	この % で囲ったデータ名のことをここではプレースホルダーと呼びます。
+	
+	このプラグインが持つ非常に重要な仕様上の欠陥ですが、
+	output.txt 内では文字列をエスケープすることができません。
+	例えば output.txt 内のテキストが "0% 100%" であれば、
+	このプラグインはそのテキストの中の "% 100%" と言う部分をプレースホルダーとして解釈し、
+	結果的にそれを除去してテキスト全体を "0" として出力します。
+	この動作を回避する方法は間に改行を挟む以外に存在しません。
+
+[about]
+title=%title%
+description=%description%
+subject=%subject%
+abstract=%abstract%
+keyword=%keyword%
+initial-creator=%initial-creator%
+editing-cycles=%editing-cycles%
+editing-time=%editing-time%
+date=%date%
+creation-date=%creation-date%
+language=%language%
+license=%license%
+
+[padded-editing-cycles]
+editing-cycles=%editing-cycles "03d"%
+
+	上記のように、ドキュメント情報のデータの名前のあとに半角スペースを入れて二重引用符 " で囲った文字列を指定すると、
+	その中の文字列を Python の str.format() により、"{0:二重引用符で囲った文字列}".format(データの値) として実行します。
+	二重引用符内に指定できる文字列は https://docs.python.org/3.11/library/string.html#formatstrings を参照してください。
+	データの値の多くは文字列型ですが、日時を表すデータの値は、それが数字であれば文字列ではなく数値になります。
+	str.format() の書式には値の型を問うものがあるため参考にしてください。
+	
+	% をエスケープできないのと同様に、" もエスケープできません。
+	ただし、% と違い、プレースホルダー外の " についてはこの制約は問題になりません。
+	この制約が問題になるのは、 str.format() の書式に " を使う必要がある時だけで、現状は書式に " を含めることはできません。
+
+[editing-time]
+raw=%editing-time raw%
+raw-date=%editing-time raw-date%
+year=%editing-time y%
+month=%editing-time M "02d"%
+day=%editing-time d "02d"%
+hour=%editing-time h "02d"%
+minute=%editing-time m "02d"%
+second=%editing-time s "02d"%
+millisecond=%editing-time ms%
+microsecond=%editing-time mcs%
+time(second)=%editing-time T%
+time(millisecond)=%editing-time t%
+time(microsecond)=%editing-time tt%
+
+raw-time=%editing-time raw-time%
+days=%editing-time days%
+seconds=%editing-time seconds%
+milliseconds=%editing-time milliseconds%
+microseconds=%editing-time microseconds%
+	
+[date]
+raw=%date raw%
+year=%date y%
+month=%date M "02d"%
+day=%date d "02d"%
+hour=%date h "02d"%
+minute=%date m "02d"%
+second=%date s "02d"%
+millisecond=%date ms%
+microsecond=%date mcs%
+time(second)=%date T%
+time(millisecond)=%date t%
+time(microsecond)=%date tt%
+
+raw-time=%date raw-time%
+days=%date days%
+seconds=%date seconds%
+milliseconds=%date milliseconds%
+microseconds=%date microseconds%
+
+[creation-date]
+raw=%creation-date raw%
+year=%creation-date y%
+month=%creation-date M "02d"%
+day=%creation-date d "02d"%
+hour=%creation-date h "02d"%
+minute=%creation-date m "02d"%
+second=%creation-date s "02d"%
+millisecond=%creation-date ms%
+microsecond=%creation-date mcs%
+time(second)=%creation-date T%
+time(millisecond)=%creation-date t%
+time(microsecond)=%creation-date tt%
+
+raw-time=%creation-date raw-time%
+days=%creation-date days%
+seconds=%creation-date seconds%
+milliseconds=%creation-date milliseconds%
+microseconds=%creation-date microseconds%
+	
+	editing-time, date, creation-date では、
+	プレースホルダーのデータ名に続いて日付けの名前を表すパラメーターを指定できます。
+		raw=データの元の値を表したもの
+		raw-date = データの元の値を ISO 8601 が定める日時表記で表したもの
+		y = 年。editing-time の場合、UNIX 元期から開始する。
+		M = 月。editing-time の場合、UNIX 元期から開始する。
+		d = 日。editing-time の場合、UNIX 元期から開始する。
+		h = 時
+		m = 分
+		s = 秒
+		ms = ミリ秒
+		mcs = マイクロ秒
+		T = UNIX時間(秒)
+		t = UNIX時間(ミリ秒)
+		tt = UNIX時間(マイクロ秒)
+		raw-time = データの元の値を UNIX時間（秒）で表したもの
+		days = UNIX 元期 からの経過日数。editing-time の場合、ファイル作成時からの経過日数。
+		seconds = UNIX 元期 からの経過秒数。editing-time の場合、ファイル作成時からの経過秒数。
+		milliseconds = UNIX 元期 からの経過ミリ秒数。editing-time の場合、ファイル作成時からの経過ミリ秒数。
+		microseconds = UNIX 元期 からの経過マイクロ秒数。editing-time の場合、ファイル作成時からの経過マイクロ秒数。
+	このパラメーターに続いて、str.format() の書式を指定することもできます。
+
+
+[author]
+full-name=%full-name%
+creator-first-name=%creator-first-name%
+creator-last-name=%creator-last-name%
+author-title=%author-title%
+position=%position%
+company=%company%
+
+[Document Information]
+%raw%
+	
+	raw は、Krita の API から取得できる無加工のドキュメント情報をそのまま出力します。
+	この情報に含まれるデータについては以下を参照してください。
+	https://api.kde.org/krita/html/classDocument.html#a9b6e49c77a3be2057cc8d051543319bf

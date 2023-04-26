@@ -1,13 +1,19 @@
 from PyQt5.QtWidgets import *
 from krita import *
 from datetime import *
+import calendar
+import os
+import re
+import time
 import xml.parsers.expat
 
 class CopyDocInfo(Extension):
-
+	
+	pattern = r'%\s*([^\s%]+)(?:\s*?([^\s%"]+?))?(?:\s*?"([^%"]*?)")?\s*?%'
+	
 	def __init__(self, parent):
 		super().__init__(parent)
-
+	
 	def setup(self):
 		pass
 	
@@ -22,77 +28,124 @@ class CopyDocInfo(Extension):
 		if doc is not None:
 			
 			di = doc.documentInfo()
-			diBk = di
+			
 			parser = xml.parsers.expat.ParserCreate()
 			
-			targets = {
-				'title': { 'prefix': '「', 'suffix': '」', 'type': 'str' },
-				'subject': { 'prefix': ' ℹ️ "', 'suffix': '"', 'type': 'str' },
-				'license': { 'prefix': ' ©️ ', 'suffix': '', 'type': 'str' },
-				'abstract': { 'prefix': '\n\n', 'suffix': '\n', 'type': 'str' },
-				'linebreak': '\n',
-				'editing-cycles': { 'prefix': '🎨 ', 'suffix': ' ', 'type': 'str' },
-				'editing-time': { 'prefix': '⏱ ', 'suffix': ' ', 'type': 'time' },
-				#'date': { 'prefix': '📝 ', 'suffix': ' ', 'type': 'date' },
-				'creation-date': { 'prefix': '🚀 ', 'suffix': '', 'type': 'date' }
-			}
-			output = {}
+			dirname = os.path.dirname(__file__)
+			outputPath = os.path.join(dirname, 'output.txt')
+			
+			QGuiApplication.clipboard().setText(outputPath)
+			
+			outputFileHandle = open(outputPath, encoding='utf-8')
+			
+			output = outputFileHandle.read()
+			
+			outputFileHandle.close()
+			
+			data = { 'raw': di }
 			currentKey = ''
 			
 			def parseStart(name, attributes):
 				nonlocal currentKey
-				if name in targets:
-					currentKey = name
-				else:
-					currentKey = ''
+				currentKey = name
+			
+			def parseEnd(name):
+				nonlocal currentKey
+				currentKey = ''
 			
 			def charData(text):
 				
-				nonlocal output
-				nonlocal currentKey
-				nonlocal doc
+				nonlocal output, currentKey, doc
 				
 				text = text.strip(' \t\n\r')
-				str = ''
 				
-				if text is not '':
+				if currentKey is not '' and text is not '':
 					
-					if currentKey in targets:
-						
-						target = targets[currentKey]
-						
-						if target['type'] == 'time':
-							date = datetime.fromtimestamp(int(text) * 1000)
-							delta = timedelta(microseconds = int(text) * 1000)
-							str = '{0}{1}日{2}時間{3}分{5}'.format(target['prefix'], delta.days if delta.days else 0, date.hour if date.hour else 0, date.minute if date.minute else 0, date.second if date.second else 0, target['suffix'])
-						
-						elif target['type'] == 'date':
-							date = datetime.fromisoformat(text)
-							str = '{0}{1}/{2:02d}/{3:02d} {4:02d}:{5:02d}{7}'.format(target['prefix'], date.year, date.month, date.day, date.hour, date.minute, date.second, target['suffix'])
-						
-						else:
-							if currentKey == 'editing-cycles':
-								doc.setDocumentInfo(diBk.replace('<editing-cycles>{0}</editing-cycles>'.format(int(text)), '<editing-cycles>{0}</editing-cycles>'.format(int(text) - 1)))
-							str = '{0}{1}{2}'.format(target['prefix'], text, target['suffix'])
-					
-					if currentKey in output:
-						output[currentKey] += str
+					if currentKey in data:
+						data[currentKey] += text
 					else:
-						output[currentKey] = str
+						data[currentKey] = text
 			
 			parser.StartElementHandler = parseStart
+			parser.EndElementHandler = parseEnd
 			parser.CharacterDataHandler = charData
 			parser.Parse(di, True)
 			
-			result = ''
-			for k in targets:
-				if type(targets[k]) is str:
-					result += targets[k]
-					continue
-				for k0 in output:
-					if k == k0:
-						result += output[k]
+			if 'editing-time' in data:
+				v = data['editing-time'] if data['editing-time'] else 0
+				data['editing-time'] = self.getDelta(int(v) * 1000)
+				data['editing-time'].update(self.getDate(int(v), True))
+				data['editing-time']['raw'] = v
 			
-			QGuiApplication.clipboard().setText(result)
+			if 'date' in data:
+				v = data['date'] if data['date'] else 0
+				data['date'] = self.getDate(v)
+				data['date'].update(self.getDelta(data['date']['tt']))
+				data['date']['raw'] = v
+			
+			if 'creation-date' in data:
+				v = data['creation-date'] if data['creation-date'] else 0
+				data['creation-date'] = self.getDate(v)
+				data['creation-date'].update(self.getDelta(data['date']['tt']))
+				data['creation-date']['raw'] = v
+			
+			while True:
+				matched = re.search(self.pattern, output)
+				if matched:
+					k = matched.group(1)
+					if k and k in data:
+						v = data[k]
+						if type(v) is not str:
+							v = v[matched.group(2)] if matched.group(2) else v['raw']
+						if matched.group(3):
+							v = ('{0:' + matched.group(3) + '}').format(int(v))
+						output = output[:matched.start()] + str(v) + output[matched.end():]
+					else:
+						output = output[:matched.start()] + output[matched.end():]
+				else:
+					break
+			
+			QGuiApplication.clipboard().setText(output)
+	
+	def getDate(self, string, asUTC = False):
+		date = datetime.fromisoformat(string) if type(string) is str else datetime.fromtimestamp(int(string))
+		if asUTC:
+			utc = int(time.mktime(date.timetuple()) - (datetime.fromtimestamp(0) - datetime(1970,1,1)).total_seconds())
+			if utc < 0:
+				utc = 0
+			date = datetime.fromtimestamp(int(time.mktime(date.timetuple()))) - (datetime.fromtimestamp(0) - datetime(1970,1,1))
+		else:
+			utc = int(time.mktime(date.timetuple()))
+		
+		data = {
+			'date': date,
+			'raw-date': string,
+			'y': date.year,
+			'M': date.month,
+			'd': date.day,
+			'h': date.hour,
+			'm': date.minute,
+			's': date.second,
+			'ms': int(date.microsecond / 1000),
+			'mcs': date.microsecond,
+			'T': utc,
+			't': utc * 1000 + int(date.microsecond / 1000),
+			'tt': utc * 1000000 + date.microsecond
+		}
+		return data
+	
+	def getDelta(self, time):
+		delta = timedelta(microseconds = int(time))
+		data = {
+			'delta': delta,
+			'raw-time': time,
+			'days': delta.days,
+			'seconds': delta.seconds,
+			'milliseconds': int(delta.microseconds / 1000),
+			'microseconds': delta.microseconds
+		}
+		return data
 
-Krita.instance().addExtension(CopyDocInfo(Krita.instance()))
+instance = Krita.instance()
+
+instance.addExtension(CopyDocInfo(instance))

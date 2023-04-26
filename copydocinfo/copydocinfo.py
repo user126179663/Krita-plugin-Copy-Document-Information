@@ -27,7 +27,7 @@ class CopyDocInfo(Extension):
 		
 		if doc is not None:
 			
-			di = doc.documentInfo()
+			di = di0 = doc.documentInfo()
 			
 			parser = xml.parsers.expat.ParserCreate()
 			
@@ -70,6 +70,11 @@ class CopyDocInfo(Extension):
 			parser.EndElementHandler = parseEnd
 			parser.CharacterDataHandler = charData
 			parser.Parse(di, True)
+			
+			if 'editing-cycles' in data:
+				v = data['editing-cycles']
+				v0 = data['editing-cycles'] = str(int(v) - 1)
+				doc.setDocumentInfo(di0.replace('<editing-cycles>' + v + '</editing-cycles>', '<editing-cycles>' + v0 + '</editing-cycles>'))
 			
 			if 'editing-time' in data:
 				v = data['editing-time'] if data['editing-time'] else 0

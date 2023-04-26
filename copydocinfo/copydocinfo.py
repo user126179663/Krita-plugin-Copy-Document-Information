@@ -33,7 +33,7 @@ class CopyDocInfo(Extension):
 				'linebreak': '\n',
 				'editing-cycles': { 'prefix': '🎨 ', 'suffix': ' ', 'type': 'str' },
 				'editing-time': { 'prefix': '⏱ ', 'suffix': ' ', 'type': 'time' },
-				'date': { 'prefix': '📝 ', 'suffix': ' ', 'type': 'date' },
+				#'date': { 'prefix': '📝 ', 'suffix': ' ', 'type': 'date' },
 				'creation-date': { 'prefix': '🚀 ', 'suffix': '', 'type': 'date' }
 			}
 			output = {}

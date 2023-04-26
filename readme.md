@@ -1,6 +1,6 @@
 # Expected Output
 ```
-<title> ℹ️ <keyword> ©️ <license>
+「<title>」 ℹ️ "<keyword>" ©️ <license>
 
 <abstract>
 

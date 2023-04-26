@@ -20,13 +20,14 @@ class CopyDocInfo(Extension):
 		doc = Krita.instance().activeDocument()
 		
 		if doc is not None:
-			cb = QGuiApplication.clipboard()
+			
 			di = doc.documentInfo()
+			diBk = di
 			parser = xml.parsers.expat.ParserCreate()
 			
 			targets = {
 				'title': { 'prefix': '「', 'suffix': '」', 'type': 'str' },
-				'subject': { 'prefix': ' ℹ️ ', 'suffix': '', 'type': 'str' },
+				'subject': { 'prefix': ' ℹ️ "', 'suffix': '"', 'type': 'str' },
 				'license': { 'prefix': ' ©️ ', 'suffix': '', 'type': 'str' },
 				'abstract': { 'prefix': '\n\n', 'suffix': '\n', 'type': 'str' },
 				'linebreak': '\n',
@@ -49,6 +50,7 @@ class CopyDocInfo(Extension):
 				
 				nonlocal output
 				nonlocal currentKey
+				nonlocal doc
 				
 				text = text.strip(' \t\n\r')
 				str = ''
@@ -69,6 +71,8 @@ class CopyDocInfo(Extension):
 							str = '{0}{1}/{2:02d}/{3:02d} {4:02d}:{5:02d}{7}'.format(target['prefix'], date.year, date.month, date.day, date.hour, date.minute, date.second, target['suffix'])
 						
 						else:
+							if currentKey == 'editing-cycles':
+								doc.setDocumentInfo(diBk.replace('<editing-cycles>{0}</editing-cycles>'.format(int(text)), '<editing-cycles>{0}</editing-cycles>'.format(int(text) - 1)))
 							str = '{0}{1}{2}'.format(target['prefix'], text, target['suffix'])
 					
 					if currentKey in output:
@@ -78,7 +82,7 @@ class CopyDocInfo(Extension):
 			
 			parser.StartElementHandler = parseStart
 			parser.CharacterDataHandler = charData
-			parser.Parse(doc.documentInfo(), True)
+			parser.Parse(di, True)
 			
 			result = ''
 			for k in targets:
@@ -89,6 +93,6 @@ class CopyDocInfo(Extension):
 					if k == k0:
 						result += output[k]
 			
-			cb.setText(result)
+			QGuiApplication.clipboard().setText(result)
 
 Krita.instance().addExtension(CopyDocInfo(Krita.instance()))

@@ -1,13 +1,33 @@
-
+	
 	output.txt 内では、ドキュメント情報のデータの値は、その名前を % で囲うことで表します。
 	この % で囲ったデータ名のことをここではプレースホルダーと呼びます。
+	
+	# プレースホルダーの書式
+		
+		%data-name [attribute-name] index-or-property-name "format-string"%
+		
+		data-name 以外の指定は任意ですが、指定する場合、上記の順番で指定しなければなりません。
+			✔️ %data-name index-or-property-name "format-string"%
+			✔️ %data-name "format-string"%
+			❌ %data-name "format-string" index-or-property-name%
+		
+		data-name
+			指定は必須です。未指定か、存在しないデータ名を指定すると、そのプレースホルダーは単にテキスト上から削除されます。
+		[attribute-name]
+			指定は任意です。プレースホルダーを置き換える値をデータの値ではなく、データに指定されている、指定した名前に対応する属性値にします。
+			この指定に対応しているデータは現状では contact だけです。
+		index-or-property-name
+			指定は任意です。データが列挙値か、拡張した値を持つ場合、指定した名前の要素ないしプロパティの値にアクセスします。
+			この指定に対応しているデータは現状では editing-time, date, creation-date です。
+		"format-string"
+			指定は任意です。データの値が数値の場合、その値を、"{0:format-string".format}(データの値) で整形します。
 	
 	このプラグインが持つ非常に重要な仕様上の欠陥ですが、
 	output.txt 内では文字列をエスケープすることができません。
 	例えば output.txt 内のテキストが "0% 100%" であれば、
 	このプラグインはそのテキストの中の "% 100%" と言う部分をプレースホルダーとして解釈し、
 	結果的にそれを除去してテキスト全体を "0" として出力します。
-	この動作を回避する方法は間に改行を挟む以外に存在しません。
+	この動作を回避する方法は今現在存在しません。
 
 [about]
 title=%title%
@@ -28,9 +48,8 @@ editing-cycles=%editing-cycles "03d"%
 
 	上記のように、ドキュメント情報のデータの名前のあとに半角スペースを入れて二重引用符 " で囲った文字列を指定すると、
 	その中の文字列を Python の str.format() により、"{0:二重引用符で囲った文字列}".format(データの値) として実行します。
+	この指定が機能するのは、値が数値として認識できるデータ（主に日時を表すデータなど）に限ります。
 	二重引用符内に指定できる文字列は https://docs.python.org/3.11/library/string.html#formatstrings を参照してください。
-	データの値の多くは文字列型ですが、日時を表すデータの値は、それが数字であれば文字列ではなく数値になります。
-	str.format() の書式には値の型を問うものがあるため参考にしてください。
 	
 	% をエスケープできないのと同様に、" もエスケープできません。
 	ただし、% と違い、プレースホルダー外の " についてはこの制約は問題になりません。
@@ -119,7 +138,7 @@ microseconds=%creation-date microseconds%
 		microseconds = UNIX 元期 から days と seconds を引いた残りの経過マイクロ秒数。editing-time の場合、UNIX 元期ではなくファイル作成時からになる。
 	このパラメーターに続いて、str.format() の書式を指定することもできます。
 
-
+C:\Users\T2\AppData\Roaming\krita\pykrita\copydocinfo\output.txt
 [author]
 full-name=%full-name%
 creator-first-name=%creator-first-name%
@@ -128,6 +147,26 @@ author-title=%author-title%
 position=%position%
 company=%company%
 
+[contact]
+contact=
+%contact%
+contact-type=
+%contact [type]%
+contac[0]=%contact 0%
+contac[0]-type=%contact [type] 0%
+	
+	contact には、ドキュメント情報に含まれる連絡先の情報が列挙されています。
+	単に contact と指定した場合、すべての連絡先を改行で区切って出力します。
+	contact には連絡先の種類を表す type と言う属性があり、contact に続けて [type] と指定することで、
+	出力する値を連絡先ではなく連絡先の種類にすることができます。
+	
+	連絡先を個別に出力する場合は、contact のあとか、[type] のあとに任意の数値を指定します。
+	数値は、Krita の 作者情報に設定した連絡先の順番に対応しており、一番上が 0 で、ひとつ下る毎に 1 ずつ増やします。
+	負の数値を指定した場合、末尾の連絡先からその数だけ遡った情報を出力します。
+	例えば連絡先が 3 つあって、-2 を指定した場合、上から二番目の連絡先の情報を出力します。
+	連絡先の合計よりも多い数を指定した場合、末尾の連絡先が出力されます。
+	0 をさらに遡る負の値を指定した場合、一番上の連絡先が出力されます。
+	
 [Document Information]
 %raw%
 	

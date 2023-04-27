@@ -78,7 +78,7 @@ class CopyDocInfo(Extension):
 			
 			if 'editing-time' in data:
 				v = data['editing-time'] if data['editing-time'] else 0
-				data['editing-time'] = self.getDelta(int(v) * 1000)
+				data['editing-time'] = self.getDelta(int(v) * 1000000)
 				data['editing-time'].update(self.getDate(int(v), True))
 				data['editing-time']['raw'] = v
 			
@@ -91,7 +91,7 @@ class CopyDocInfo(Extension):
 			if 'creation-date' in data:
 				v = data['creation-date'] if data['creation-date'] else 0
 				data['creation-date'] = self.getDate(v)
-				data['creation-date'].update(self.getDelta(data['date']['tt']))
+				data['creation-date'].update(self.getDelta(data['creation-date']['tt']))
 				data['creation-date']['raw'] = v
 			
 			while True:

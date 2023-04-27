@@ -114,9 +114,9 @@ microseconds=%creation-date microseconds%
 		tt = UNIX時間(マイクロ秒)
 		raw-time = データの元の値を UNIX時間（秒）で表したもの
 		days = UNIX 元期 からの経過日数。editing-time の場合、ファイル作成時からの経過日数。
-		seconds = UNIX 元期 からの経過秒数。editing-time の場合、ファイル作成時からの経過秒数。
-		milliseconds = UNIX 元期 からの経過ミリ秒数。editing-time の場合、ファイル作成時からの経過ミリ秒数。
-		microseconds = UNIX 元期 からの経過マイクロ秒数。editing-time の場合、ファイル作成時からの経過マイクロ秒数。
+		seconds = UNIX 元期 から days を引いた残りの経過秒数。editing-time の場合、UNIX 元期ではなくファイル作成時からになる。
+		milliseconds = UNIX 元期 から days と seconds を引いた残りの経過ミリ秒数。editing-time の場合、UNIX 元期ではなくファイル作成時からになる。
+		microseconds = UNIX 元期 から days と seconds を引いた残りの経過マイクロ秒数。editing-time の場合、UNIX 元期ではなくファイル作成時からになる。
 	このパラメーターに続いて、str.format() の書式を指定することもできます。
 
 

@@ -138,7 +138,6 @@ microseconds=%creation-date microseconds%
 		microseconds = UNIX 元期 から days と seconds を引いた残りの経過マイクロ秒数。editing-time の場合、UNIX 元期ではなくファイル作成時からになる。
 	このパラメーターに続いて、str.format() の書式を指定することもできます。
 
-C:\Users\T2\AppData\Roaming\krita\pykrita\copydocinfo\output.txt
 [author]
 full-name=%full-name%
 creator-first-name=%creator-first-name%

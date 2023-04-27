@@ -9,7 +9,7 @@ import xml.parsers.expat
 
 class CopyDocInfo(Extension):
 	
-	pattern = r'%\s*([^\s%]+)(?:\s*?([^\s%"]+?))?(?:\s*?"([^%"]*?)")?\s*?%'
+	pattern = r'%\s*([^\s%]+)(?:\s*?\[([^%"]*?)\])?(?:\s*?([^\s%"\[\]]+?))?(?:\s*?"([^%"]*?)")?\s*?%'
 	
 	def __init__(self, parent):
 		super().__init__(parent)
@@ -44,14 +44,17 @@ class CopyDocInfo(Extension):
 			
 			data = { 'raw': di }
 			currentKey = ''
+			attr = None
 			
-			def parseStart(name, attributes):
-				nonlocal currentKey
+			def parseStart(name, attribute):
+				nonlocal currentKey, attr
 				currentKey = name
+				attr = attribute if type(attribute) is dict else {}
 			
 			def parseEnd(name):
-				nonlocal currentKey
+				nonlocal currentKey, attr
 				currentKey = ''
+				attr = None
 			
 			def charData(text):
 				
@@ -59,12 +62,17 @@ class CopyDocInfo(Extension):
 				
 				text = text.strip(' \t\n\r')
 				
-				if currentKey is not '' and text is not '':
+				if currentKey and text:
 					
 					if currentKey in data:
-						data[currentKey] += text
+						if isinstance(data[currentKey], list):
+							attr['$'] = text
+							data[currentKey].append(attr)
+						else:
+							data[currentKey]['$'] += text
 					else:
-						data[currentKey] = text
+						attr['$'] = text
+						data[currentKey] = [ attr ] if currentKey == 'contact' else attr
 			
 			parser.StartElementHandler = parseStart
 			parser.EndElementHandler = parseEnd
@@ -72,39 +80,72 @@ class CopyDocInfo(Extension):
 			parser.Parse(di, True)
 			
 			if 'editing-cycles' in data:
-				v = data['editing-cycles']
-				v0 = data['editing-cycles'] = str(int(v) - 1)
+				v = data['editing-cycles']['$']
+				v0 = data['editing-cycles']['$'] = str(int(v) - 1)
 				doc.setDocumentInfo(di0.replace('<editing-cycles>' + v + '</editing-cycles>', '<editing-cycles>' + v0 + '</editing-cycles>'))
 			
 			if 'editing-time' in data:
-				v = data['editing-time'] if data['editing-time'] else 0
-				data['editing-time'] = self.getDelta(int(v) * 1000000)
-				data['editing-time'].update(self.getDate(int(v), True))
-				data['editing-time']['raw'] = v
+				v = data['editing-time']['$'] if data['editing-time']['$'] else 0
+				data['editing-time']['$$'] = self.getDelta(int(v) * 1000000)
+				data['editing-time']['$$'].update(self.getDate(int(v), True))
+				data['editing-time']['$$']['raw'] = data['editing-time']['$'] = v
 			
 			if 'date' in data:
-				v = data['date'] if data['date'] else 0
-				data['date'] = self.getDate(v)
-				data['date'].update(self.getDelta(data['date']['tt']))
-				data['date']['raw'] = v
+				v = data['date']['$'] if data['date']['$'] else 0
+				data['date']['$$'] = self.getDate(v)
+				data['date']['$$'].update(self.getDelta(data['date']['$$']['tt']))
+				data['date']['$$']['raw'] = data['date']['$'] = v
 			
 			if 'creation-date' in data:
-				v = data['creation-date'] if data['creation-date'] else 0
-				data['creation-date'] = self.getDate(v)
-				data['creation-date'].update(self.getDelta(data['creation-date']['tt']))
-				data['creation-date']['raw'] = v
+				v = data['creation-date']['$'] if data['creation-date']['$'] else 0
+				data['creation-date']['$$'] = self.getDate(v)
+				data['creation-date']['$$'].update(self.getDelta(data['creation-date']['$$']['tt']))
+				data['creation-date']['$$']['raw'] = data['date']['creation-date'] = v
 			
 			while True:
 				matched = re.search(self.pattern, output)
 				if matched:
 					k = matched.group(1)
 					if k and k in data:
+						
 						v = data[k]
-						if type(v) is not str:
-							v = v[matched.group(2)] if matched.group(2) else v['raw']
-						if matched.group(3):
-							v = ('{0:' + matched.group(3) + '}').format(int(v))
-						output = output[:matched.start()] + str(v) + output[matched.end():]
+						
+						if isinstance(v, list):
+							i = matched.group(3)
+							l = len(v)
+							if i:
+								i = int(i)
+								i = i if i < l else l - 1
+								i = l + i if i < 0 else i
+								i = 0 if i < 0 else i
+								v = v[i] if i < l else ''
+						
+						if isinstance(v, list) is False:
+							v = [ v ]
+						
+						l = len(v)
+						values = []
+						for i in range(l):
+							
+							v0 = v[i]
+							
+							if type(v0) is dict:
+								attrName = matched.group(2)
+								v0 = v0[attrName] if attrName and attrName in v0 else v0
+								if type(v0) is dict:
+									if '$$' in v0:
+										v0 = v0['$$']
+										if type(v0) is dict:
+											v0 = v0[matched.group(3)] if matched.group(3) else v0['raw']
+									else:
+										v0 = v0['$'] if '$' in v0 else ''
+							if matched.group(4):
+								v0 = ('{0:' + matched.group(4) + '}').format(int(v0))
+							
+							values.append(str(v0))
+							
+						output = output[:matched.start()] + '\n'.join(values) + output[matched.end():]
+							
 					else:
 						output = output[:matched.start()] + output[matched.end():]
 				else:

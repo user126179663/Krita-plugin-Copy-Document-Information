@@ -165,6 +165,20 @@ contac[0]-type=%contact [type] 0%
 	例えば連絡先が 3 つあって、-2 を指定した場合、上から二番目の連絡先の情報を出力します。
 	連絡先の合計よりも多い数を指定した場合、末尾の連絡先が出力されます。
 	0 をさらに遡る負の値を指定した場合、一番上の連絡先が出力されます。
+
+[document]
+color-depth=%color-depth%
+color-model=%color-model%
+color-profile=%color-profile%
+file-name=%file-name%
+height=%height%
+name=%name%
+resolution=%resolution%
+width=%width%
+x-offset=%x-offset%
+x-res=%x-res%
+y-offset=%y-offset%
+y-res=%y-res%
 	
 [Document Information]
 %raw%

@@ -1,3 +1,4 @@
+from PyQt5.QtCore import pyqtSlot
 from PyQt5.QtWidgets import *
 from krita import *
 from datetime import *
@@ -6,9 +7,13 @@ import os
 import re
 import time
 import xml.parsers.expat
+import asyncio
+
+instance = Krita.instance()
 
 class CopyDocInfo(Extension):
 	
+	outputFileName = 'output.txt'
 	pattern = r'%\s*([^\s%]+)(?:\s*?\[([^%"]*?)\])?(?:\s*?([^\s%"\[\]]+?))?(?:\s*?"([^%"]*?)")?\s*?%'
 	
 	def __init__(self, parent):
@@ -19,30 +24,72 @@ class CopyDocInfo(Extension):
 	
 	def createActions(self, window):
 		action = window.createAction('docinfo', 'Copy Document Infomation', 'tools/script')
-		action.triggered.connect(self.copyDocumentInformation)
+		action.triggered.connect(self.triggered)
 	
-	def copyDocumentInformation(self):
+	def existsOutput(self, fileName = None):
+		
+		if not fileName:
+			fileName = CopyDocInfo.outputFileName
+		
+		outputPath = os.path.join(os.path.dirname(__file__), fileName)
+		
+		if os.path.isfile(outputPath):
+			return outputPath
+		else:
+			return False
+		
+	
+	def getOutput(self, fileName = None):
+		
+		outputPath = self.existsOutput(fileName)
+		
+		if outputPath:
+			outputFileHandle = open(outputPath, encoding='utf-8')
+			output = outputFileHandle.read()
+			outputFileHandle.close()
+		else:
+			output = ''
+		
+		return output
+	
+	def setOutput(self, content = '', fileName = None):
+		
+		outputPath = self.existsOutput(fileName)
+		
+		outputFileHandle = open(outputPath, mode='w', encoding='utf-8')
+		outputFileHandle.write(content)
+		outputFileHandle.close()
+		
+	
+	def output(self, pre = ''):
 		
 		doc = Krita.instance().activeDocument()
 		
-		if doc is not None:
+		if doc:
 			
 			di = di0 = doc.documentInfo()
 			
 			parser = xml.parsers.expat.ParserCreate()
 			
-			dirname = os.path.dirname(__file__)
-			outputPath = os.path.join(dirname, 'output.txt')
+			output = pre if type(pre) is str and pre else self.getOutput()
 			
-			QGuiApplication.clipboard().setText(outputPath)
-			
-			outputFileHandle = open(outputPath, encoding='utf-8')
-			
-			output = outputFileHandle.read()
-			
-			outputFileHandle.close()
-			
-			data = { 'raw': di }
+			data = {
+				'raw': di,
+				'color-depth': doc.colorDepth(),
+				'color-model': doc.colorModel(),
+				'color-profile': doc.colorProfile(),
+				'file-name': doc.fileName(),
+				'height': doc.height(),
+				'name': doc.name(),
+				'resolution': doc.resolution(),
+				'width': doc.width(),
+				'x-offset': doc.xOffset(),
+				'x-res': doc.xRes(),
+				'y-offset': doc.yOffset(),
+				'y-res': doc.yRes()
+				# GroupLayer に findChildNodes 属性がないと言うエラーが通知される。恐らく最新バージョンでは使える？
+				#'total-layers': len(doc.rootNode().findChildNodes(recursive = True))
+			}
 			currentKey = ''
 			attr = None
 			
@@ -151,7 +198,19 @@ class CopyDocInfo(Extension):
 				else:
 					break
 			
-			QGuiApplication.clipboard().setText(output)
+			return output
+		
+	
+	def copyDocumentInformation(self, pre = ''):
+			
+		# Just for the debugging
+		QGuiApplication.clipboard().setText('FAILED_TO_COPY_DOCUMENT_INFORMATION')
+		
+		QGuiApplication.clipboard().setText(self.output(pre))
+	
+	def triggered(self):
+		
+		self.copyDocumentInformation()
 	
 	def getDate(self, string, asUTC = False):
 		date = datetime.fromisoformat(string) if type(string) is str else datetime.fromtimestamp(int(string))
@@ -192,6 +251,159 @@ class CopyDocInfo(Extension):
 		}
 		return data
 
-instance = Krita.instance()
+class CopyDocInfoDocker(DockWidget):
+	
+	getActiveDocumentTimeout = 5000.0
+	
+	def __init__(self):
+		
+		super().__init__()
+		
+		self.setWindowTitle('Doc Info')
+		mainWidget = QWidget(self)
+		self.setWidget(mainWidget)
+		
+		self.instance = Krita.instance()
+		self.instanceNotifier = self.instance.notifier()
+		
+		self.instanceNotifier.imageCreated.connect(self.createdImage)
+		self.instanceNotifier.imageClosed.connect(self.closedImage)
+		
+		self.setExtension(copyDocInfo)
+		
+		self.mainLayout = QVBoxLayout()
+		
+		self.rootLayout = QBoxLayout(QBoxLayout.TopToBottom)
+		mainWidget.setLayout(self.rootLayout)
+		
+		self.tabs = QTabWidget()
+		# createdImage, closedImage の発生後に Krita.instance().activeDocument() を取得できないため（恐らく Krita の仕様）
+		# それらのシグナルと同期してプレビュータブを更新する機能は未使用にしている。
+		# self.tabs.currentChanged.connect(self.changedTab)
+		
+		self.editTab = QWidget()
+		self.editTabLayout = QVBoxLayout()
+		self.editTab.setLayout(self.editTabLayout)
+		
+		self.editControlLayout = QHBoxLayout()
+		self.editEditLayout = QVBoxLayout()
+		
+		self.copyButton = QPushButton('Copy')
+		self.copyButton.setEnabled(False)
+		self.copyButton.clicked.connect(self.clickedCopyButton)
+		
+		output = self.extension.getOutput()
+		
+		self.saveButton = QPushButton('Save')
+		self.saveButton.setEnabled(False)
+		self.saveButton.clicked.connect(self.clickedSaveButton)
+		
+		self.clearButton = QPushButton('Clear')
+		self.clearButton.clicked.connect(self.clickedClearButton)
+		
+		self.editControlLayout.addWidget(self.copyButton)
+		self.editControlLayout.addWidget(self.saveButton)
+		# self.editControlLayout.addWidget(self.clearButton)
+		
+		self.textEdit = QPlainTextEdit()
+		self.textEdit.setPlainText(output)
+		self.textEdit.textChanged.connect(self.changedText)
+		self.lastOutput = self.textEdit.toPlainText()
+		
+		self.editEditLayout.addWidget(self.textEdit)
+		
+		self.editTabLayout.addLayout(self.editControlLayout)
+		self.editTabLayout.addLayout(self.editEditLayout)
+		
+		self.previewTab = QWidget()
+		self.previewTabLayout = QVBoxLayout()
+		self.previewTab.setLayout(self.previewTabLayout)
+		
+		self.previewControlLayout = QHBoxLayout()
+		self.previewEditLayout = QVBoxLayout()
+		
+		self.previewCopyButton = QPushButton('Copy')
+		self.previewCopyButton.clicked.connect(self.clickedPreviewCopyButton)
+		
+		self.previewUpdateButton = QPushButton('Update')
+		self.previewUpdateButton.setEnabled(False)
+		self.previewUpdateButton.clicked.connect(self.clickedPreviewUpdateButton)
+		
+		self.previewControlLayout.addWidget(self.previewCopyButton)
+		self.previewControlLayout.addWidget(self.previewUpdateButton)
+		
+		self.previewText = QPlainTextEdit()
+		
+		self.previewEditLayout.addWidget(self.previewText)
+		
+		self.previewTabLayout.addLayout(self.previewControlLayout)
+		self.previewTabLayout.addLayout(self.previewEditLayout)
+		
+		self.tabs.addTab(self.editTab, 'Edit')
+		self.tabs.addTab(self.previewTab, 'Preview')
+		
+		self.mainLayout.addWidget(self.tabs)
+		
+		mainWidget.layout().addLayout(self.mainLayout)
+	
+	async def getActiveDocument(self):
+		begin = time.time()
+		while True:
+			doc = self.instance.activeDocument()
+			if doc:
+				return doc
+			elif (time.time() - begin) >= self.getActiveDocumentTimeout:
+				return None
+			await asyncio.sleep(16)
+	
+	def clickedPreviewUpdateButton(self):
+		self.previewText.setPlainText(self.extension.output(self.textEdit.toPlainText()))
+	
+	def clickedPreviewCopyButton(self):
+		self.extension.copyDocumentInformation(self.previewText.toPlainText())
+	
+	def changedTab(self):
+		if self.tabs.currentWidget() is self.previewTab and len(self.instance.documents()):
+		# if self.tabs.currentWidget() is self.previewTab and asyncio.run(self.getActiveDocument()):
+			self.previewText.setPlainText(self.extension.output(self.textEdit.toPlainText()))
+	
+	def createdImage(self):
+		self.copyButton.setEnabled(True)
+		self.previewUpdateButton.setEnabled(True)
+		# self.changedTab()
+	
+	def closedImage(self):
+		if not len(self.instance.documents()):
+			self.copyButton.setEnabled(False)
+			self.previewUpdateButton.setEnabled(False)
+	
+	def clickedCopyButton(self):
+		self.extension.copyDocumentInformation()
+	
+	def clickedSaveButton(self):
+		plainText = self.textEdit.toPlainText()
+		if self.lastOutput != plainText:
+			self.lastOutput = plainText
+			self.extension.setOutput(plainText)
+			self.saveButton.setEnabled(False)
+	
+	def clickedClearButton(self):
+		self.textEdit.setPlainText('')
+	
+	def changedText(self):
+		if self.lastOutput == self.textEdit.toPlainText():
+			self.saveButton.setEnabled(False)
+		else:
+			self.saveButton.setEnabled(True)
+	
+	def canvasChanged(self, canvas):
+		pass
+	
+	def setExtension(self, extension):
+		if isinstance(extension, CopyDocInfo):
+			self.extension = extension
 
-instance.addExtension(CopyDocInfo(instance))
+copyDocInfo = CopyDocInfo(instance)
+instance.addExtension(copyDocInfo)
+copyDocInfoDocker = DockWidgetFactory('cooyDocInfo', DockWidgetFactoryBase.DockRight, CopyDocInfoDocker)
+instance.addDockWidgetFactory(copyDocInfoDocker)
